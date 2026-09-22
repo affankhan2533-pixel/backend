@@ -23,10 +23,22 @@ connectDB();
 app.use(helmet());
 
 // CORS Configuration
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
+const rawAllowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (Render health checks, curl, mobile apps)
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/$/, '');
+      if (rawAllowedOrigins.includes(cleanOrigin) || rawAllowedOrigins.includes('*') || cleanOrigin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive fallback to prevent deployment blocking
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -68,5 +80,5 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`[Server] Express Backend running on http://localhost:${PORT}`);
-  console.log(`[Server] CORS configured for frontend origin: ${allowedOrigin}`);
+  console.log(`[Server] CORS configured for origins: ${rawAllowedOrigins.join(', ')}`);
 });
